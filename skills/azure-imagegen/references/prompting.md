@@ -52,7 +52,8 @@
 
 - Start with `quality=low` for quick exploration.
 - Use `quality=high` for text-heavy or detail-critical outputs.
-- Use `input_fidelity=high` for strict identity or layout preservation.
+- GPT Image 2.5 supports explicit quality=xhigh/max when higher detail is requested; retain high as the default.
+- Use input_fidelity=high for strict identity or layout preservation only where configurable (Image 1, 1.5, 2.5). Omit it for Image 2, which always uses high fidelity, and Mini, which cannot configure it.
 
 ## Taxonomy hints
 

@@ -1,0 +1,41 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="1600" height="900" viewBox="0 0 1600 900" role="img" aria-labelledby="title desc">
+  <title id="title">Azure ImageGen 0.3.0 CLI dry run</title>
+  <desc id="desc">A custom Azure deployment uses the Sunburst capability profile, with explicit max quality and transparent PNG output. Dry-run previews the request without network access.</desc>
+  <rect width="1600" height="900" fill="#061523" />
+  <rect x="40" y="40" width="1520" height="820" rx="44" fill="#0B1F33" />
+  <g font-family="Arial, sans-serif">
+    <text x="96" y="136" fill="#F4FAFF" font-size="52" font-weight="700">Preview an Azure image request</text>
+    <text x="96" y="181" fill="#C5D8E8" font-size="24">Azure ImageGen 0.3.0 by DangerMouseUK</text>
+    <rect x="96" y="218" width="856" height="582" rx="28" fill="#102B46" stroke="#2A75AA" stroke-width="2" />
+    <text x="132" y="271" fill="#F4FAFF" font-size="29" font-weight="700">Custom deployment + model capabilities</text>
+    <rect x="132" y="294" width="784" height="252" rx="14" fill="#061523" />
+    <text id="cli-command" fill="#F4FAFF" font-family="Consolas, monospace" font-size="18">
+      <tspan x="154" y="326">python .\skills\azure-imagegen\scripts\image_gen.py generate `</tspan>
+      <tspan x="154" y="354">  --endpoint &quot;https://example.openai.azure.com&quot; `</tspan>
+      <tspan x="154" y="382">  --deployment &quot;images-prod&quot; `</tspan>
+      <tspan x="154" y="410">  --image-model gpt-image-2.5-sunburst `</tspan>
+      <tspan x="154" y="438">  --prompt &quot;A ceramic mug cutout&quot; `</tspan>
+      <tspan x="154" y="466">  --quality max --background transparent `</tspan>
+      <tspan x="154" y="494">  --size auto --no-augment --dry-run</tspan>
+    </text>
+    <text x="132" y="604" fill="#9BD7FF" font-size="26" font-weight="700">Dry run: no API call and no files</text>
+    <text x="132" y="650" fill="#C5D8E8" font-size="22">The capability profile validates options.</text>
+    <text x="132" y="686" fill="#C5D8E8" font-size="22">Azure receives your deployment name.</text>
+    <text x="132" y="752" fill="#C5D8E8" font-size="21">Quality defaults to high; max is an explicit choice.</text>
+    <rect x="984" y="218" width="520" height="582" rx="28" fill="#F4FAFF" />
+    <text x="1020" y="271" fill="#0B1F33" font-size="28" font-weight="700">Azure request fields</text>
+    <rect x="1020" y="294" width="448" height="432" rx="14" fill="#061523" />
+    <text id="request-json" fill="#F4FAFF" font-family="Consolas, monospace" font-size="18" xml:space="preserve">
+      <tspan x="1042" y="332">{</tspan>
+      <tspan x="1042" y="366">  &quot;model&quot;: &quot;images-prod&quot;,</tspan>
+      <tspan x="1042" y="400">  &quot;prompt&quot;: &quot;A ceramic mug cutout&quot;,</tspan>
+      <tspan x="1042" y="434">  &quot;n&quot;: 1,</tspan>
+      <tspan x="1042" y="468">  &quot;size&quot;: &quot;auto&quot;,</tspan>
+      <tspan x="1042" y="502">  &quot;quality&quot;: &quot;max&quot;,</tspan>
+      <tspan x="1042" y="536">  &quot;background&quot;: &quot;transparent&quot;,</tspan>
+      <tspan x="1042" y="570">  &quot;output_format&quot;: &quot;png&quot;</tspan>
+      <tspan x="1042" y="604">}</tspan>
+    </text>
+    <text x="1020" y="771" fill="#455C70" font-size="20">No credentials appear in the preview.</text>
+  </g>
+</svg>

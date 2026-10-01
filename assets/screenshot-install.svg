@@ -1,52 +1,50 @@
 <svg xmlns="http://www.w3.org/2000/svg" width="1600" height="900" viewBox="0 0 1600 900" role="img" aria-labelledby="title desc">
-  <title id="title">Install the Azure ImageGen plugin</title>
-  <desc id="desc">Clone DangerMouseUK's repository, register a complete local marketplace catalog, then restart Codex and install the plugin.</desc>
-
+  <title id="title">Install Azure ImageGen 0.3.0</title>
+  <desc id="desc">Register the DangerMouseUK Git marketplace, install Azure ImageGen, configure Python and Azure, and start a new Codex chat. The complete included catalog points to the plugin root.</desc>
   <rect width="1600" height="900" fill="#061523" />
   <rect x="40" y="40" width="1520" height="820" rx="44" fill="#0B1F33" />
-
   <g font-family="Arial, sans-serif">
     <text x="96" y="136" fill="#F4FAFF" font-size="52" font-weight="700">Install Azure ImageGen</text>
-    <text x="96" y="181" fill="#C5D8E8" font-size="24">A local Codex plugin from DangerMouseUK</text>
-
+    <text x="96" y="181" fill="#C5D8E8" font-size="24">A Codex plugin by DangerMouseUK</text>
     <rect x="96" y="218" width="620" height="224" rx="28" fill="#F4FAFF" />
-    <text x="132" y="271" fill="#0B1F33" font-size="29" font-weight="700">1. Clone into your home folder</text>
+    <text x="132" y="271" fill="#0B1F33" font-size="29" font-weight="700">1. Register and install</text>
     <rect x="132" y="294" width="548" height="112" rx="14" fill="#102B46" />
-    <text x="150" y="324" fill="#F4FAFF" font-family="Consolas, monospace" font-size="17">git clone `</text>
-    <text x="150" y="354" fill="#9BD7FF" font-family="Consolas, monospace" font-size="17">https://github.com/dangermouseuk/azure-imagegen.git `</text>
-    <text x="150" y="384" fill="#F4FAFF" font-family="Consolas, monospace" font-size="17">&quot;$HOME\plugins\azure-imagegen&quot;</text>
-
+    <text x="150" y="324" fill="#F4FAFF" font-family="Consolas, monospace" font-size="17">codex plugin marketplace add `</text>
+    <text x="150" y="354" fill="#9BD7FF" font-family="Consolas, monospace" font-size="17">dangermouseuk/azure-imagegen --ref main</text>
+    <text x="150" y="384" fill="#F4FAFF" font-family="Consolas, monospace" font-size="17">codex plugin add azure-imagegen@dangermouseuk</text>
     <rect x="96" y="470" width="620" height="330" rx="28" fill="#F4FAFF" />
-    <text x="132" y="526" fill="#0B1F33" font-size="29" font-weight="700">3. Install in Codex</text>
-    <text x="132" y="577" fill="#455C70" font-size="23">Save the catalog, then restart Codex.</text>
-    <text x="132" y="613" fill="#455C70" font-size="23">Open the plugin directory and install</text>
-    <text x="132" y="649" fill="#0078D4" font-size="25" font-weight="700">Azure ImageGen.</text>
-    <text x="132" y="703" fill="#455C70" font-size="21">Already have a catalog? Add this entry</text>
-    <text x="132" y="735" fill="#455C70" font-size="21">to its plugins array. See README for</text>
-    <text x="132" y="767" fill="#455C70" font-size="21">repo-local setup and Python dependencies.</text>
-
+    <text x="132" y="526" fill="#0B1F33" font-size="29" font-weight="700">2. Configure Python and Azure</text>
+    <text x="132" y="574" fill="#455C70" font-size="22">Install dependencies from the plugin root.</text>
+    <rect x="132" y="595" width="548" height="54" rx="14" fill="#102B46" />
+    <text x="150" y="630" fill="#F4FAFF" font-family="Consolas, monospace" font-size="19">python -m pip install --upgrade -e .</text>
+    <text x="132" y="687" fill="#455C70" font-size="22">Use your Azure endpoint and deployment.</text>
+    <text x="132" y="735" fill="#0078D4" font-size="25" font-weight="700">3. Start a new Codex chat</text>
+    <text x="132" y="770" fill="#455C70" font-size="21">See README for Entra auth and refresh commands.</text>
     <rect x="748" y="218" width="756" height="582" rx="28" fill="#102B46" stroke="#2A75AA" stroke-width="2" />
-    <text x="784" y="271" fill="#F4FAFF" font-size="29" font-weight="700">2. Register your local marketplace</text>
-    <text x="784" y="307" fill="#9BD7FF" font-family="Consolas, monospace" font-size="20">~/.agents/plugins/marketplace.json</text>
+    <text x="784" y="271" fill="#F4FAFF" font-size="29" font-weight="700">Repository catalog (included)</text>
+    <text x="784" y="307" fill="#9BD7FF" font-family="Consolas, monospace" font-size="20">.agents/plugins/marketplace.json</text>
     <rect x="784" y="329" width="684" height="437" rx="14" fill="#061523" />
-    <text id="marketplace-json" fill="#F4FAFF" font-family="Consolas, monospace" font-size="18" xml:space="preserve">
+    <text id="marketplace-json" fill="#F4FAFF" font-family="Consolas, monospace" font-size="17" xml:space="preserve">
       <tspan x="806" y="358">{</tspan>
-      <tspan x="806" y="382">  &quot;name&quot;: &quot;local-plugins&quot;,</tspan>
-      <tspan x="806" y="406">  &quot;plugins&quot;: [</tspan>
-      <tspan x="806" y="430">    {</tspan>
-      <tspan x="806" y="454">      &quot;name&quot;: &quot;azure-imagegen&quot;,</tspan>
-      <tspan x="806" y="478">      &quot;source&quot;: {</tspan>
-      <tspan x="806" y="502">        &quot;source&quot;: &quot;local&quot;,</tspan>
-      <tspan x="806" y="526">        &quot;path&quot;: &quot;./plugins/azure-imagegen&quot;</tspan>
-      <tspan x="806" y="550">      },</tspan>
-      <tspan x="806" y="574">      &quot;policy&quot;: {</tspan>
-      <tspan x="806" y="598">        &quot;installation&quot;: &quot;AVAILABLE&quot;,</tspan>
-      <tspan x="806" y="622">        &quot;authentication&quot;: &quot;ON_INSTALL&quot;</tspan>
-      <tspan x="806" y="646">      },</tspan>
-      <tspan x="806" y="670">      &quot;category&quot;: &quot;Productivity&quot;</tspan>
-      <tspan x="806" y="694">    }</tspan>
-      <tspan x="806" y="718">  ]</tspan>
-      <tspan x="806" y="742">}</tspan>
+      <tspan x="806" y="379">  "name": "dangermouseuk",</tspan>
+      <tspan x="806" y="400">  "interface": {</tspan>
+      <tspan x="806" y="421">    "displayName": "DangerMouseUK"</tspan>
+      <tspan x="806" y="442">  },</tspan>
+      <tspan x="806" y="463">  "plugins": [</tspan>
+      <tspan x="806" y="484">    {</tspan>
+      <tspan x="806" y="505">      "name": "azure-imagegen",</tspan>
+      <tspan x="806" y="526">      "source": {</tspan>
+      <tspan x="806" y="547">        "source": "local",</tspan>
+      <tspan x="806" y="568">        "path": "./"</tspan>
+      <tspan x="806" y="589">      },</tspan>
+      <tspan x="806" y="610">      "policy": {</tspan>
+      <tspan x="806" y="631">        "installation": "AVAILABLE",</tspan>
+      <tspan x="806" y="652">        "authentication": "ON_INSTALL"</tspan>
+      <tspan x="806" y="673">      },</tspan>
+      <tspan x="806" y="694">      "category": "Productivity"</tspan>
+      <tspan x="806" y="715">    }</tspan>
+      <tspan x="806" y="736">  ]</tspan>
+      <tspan x="806" y="757">}</tspan>
     </text>
   </g>
 </svg>

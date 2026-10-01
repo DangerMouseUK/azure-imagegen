@@ -112,7 +112,11 @@ Primary request: extract the product on a transparent background
 Constraints: crisp silhouette, no halos or fringing; preserve label text exactly; no restyling
 ```
 
-### gpt-image-2-key-color-cutout
+### key-color-cutout-fallback
+
+Use this fallback when native transparent PNG is unavailable on your deployment.
+Image 2.5 accepts native transparency; Image 2 transparency is preview. Color-key
+removal works best with a pure background and no key color in the subject.
 
 ```text
 Use case: background-extraction

@@ -1,6 +1,6 @@
 {
   "name": "azure-imagegen",
-  "version": "0.2.0",
+  "version": "0.3.0",
   "description": "Azure OpenAI v1 image generation and editing plugin for Codex with a bundled Python CLI.",
   "author": {
     "name": "DangerMouseUK",

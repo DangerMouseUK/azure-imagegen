@@ -18,15 +18,16 @@
     <text x="132" y="642" fill="#0B1F33" font-size="31" font-weight="700">Azure ImageGen</text>
     <text x="132" y="684" fill="#455C70" font-size="22">Azure OpenAI image workflows</text>
     <text x="132" y="715" fill="#455C70" font-size="22">for Codex.</text>
+    <text x="132" y="762" fill="#0078D4" font-size="21" font-weight="700">DangerMouseUK</text>
 
     <rect x="568" y="230" width="936" height="306" rx="28" fill="#102B46" stroke="#2A75AA" stroke-width="2" />
-    <text x="608" y="286" fill="#F4FAFF" font-size="31" font-weight="700">Plugin manifest</text>
+    <text x="608" y="286" fill="#F4FAFF" font-size="31" font-weight="700">Portable manifest</text>
     <line x1="608" y1="308" x2="1464" y2="308" stroke="#315B7B" stroke-width="2" />
 
     <text x="608" y="353" fill="#9BD7FF" font-size="19" font-weight="700">NAME</text>
     <text x="608" y="389" fill="#F4FAFF" font-size="28">azure-imagegen</text>
     <text x="1084" y="353" fill="#9BD7FF" font-size="19" font-weight="700">VERSION</text>
-    <text x="1084" y="389" fill="#F4FAFF" font-size="28">0.2.0</text>
+    <text x="1084" y="389" fill="#F4FAFF" font-size="28">0.3.0</text>
 
     <text x="608" y="447" fill="#9BD7FF" font-size="19" font-weight="700">SKILL PATH</text>
     <text x="608" y="483" fill="#F4FAFF" font-size="28">./skills/</text>
@@ -41,7 +42,7 @@
 
     <rect x="1052" y="568" width="452" height="232" rx="28" fill="#F4FAFF" />
     <text x="1088" y="625" fill="#0B1F33" font-size="29" font-weight="700">Distribution</text>
-    <text x="1088" y="682" fill="#455C70" font-size="21">Install the repository root as a plugin.</text>
-    <text x="1088" y="724" fill="#455C70" font-size="21">Release via GitHub tags and archives.</text>
+    <text x="1088" y="682" fill="#455C70" font-size="21">Portable manifest and legacy fallback.</text>
+    <text x="1088" y="724" fill="#455C70" font-size="21">Git marketplace, tags, and archives.</text>
   </g>
 </svg>

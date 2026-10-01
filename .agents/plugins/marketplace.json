@@ -1,0 +1,20 @@
+{
+  "name": "dangermouseuk",
+  "interface": {
+    "displayName": "DangerMouseUK"
+  },
+  "plugins": [
+    {
+      "name": "azure-imagegen",
+      "source": {
+        "source": "local",
+        "path": "./"
+      },
+      "policy": {
+        "installation": "AVAILABLE",
+        "authentication": "ON_INSTALL"
+      },
+      "category": "Productivity"
+    }
+  ]
+}

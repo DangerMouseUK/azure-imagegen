@@ -1,121 +1,71 @@
 ---
 name: azure-imagegen
-description: "Generate, edit, and batch-create images with Azure OpenAI v1 Image API. Use when Codex needs Azure-first image generation or image editing workflows for deployed image models, including prompt-to-image, masked edits, background extraction, transparent backgrounds, product shots, UI mockups, or batch JSONL runs, with API key or Entra ID authentication via the bundled CLI (`scripts/image_gen.py`)."
+description: "Generate, edit, and batch-create images with Azure OpenAI v1 Image API. Use when Codex needs Azure image generation or editing with deployed GPT Image models, including Sunburst and Flare, prompt-to-image, masked edits, transparent backgrounds, product shots, UI mockups, or batch JSONL runs, with API key or Entra ID authentication via the bundled CLI (scripts/image_gen.py)."
 ---
 
 # Azure ImageGen
 
-Generate or edit images with Azure OpenAI v1 by using the bundled CLI `scripts/image_gen.py`. Use deployment names instead of raw model names, prefer dry-runs before live calls, and keep the skill Azure-specific.
-
-## Runtime Scope
-
-- Target Azure OpenAI v1 only.
-- Use the Image API only in v1.
-- Exclude classic Azure `api-version` endpoints.
-- Exclude a Responses API runtime path in v1.
-- Infer GPT-image-2 behavior when the Azure deployment name contains `gpt-image-2`.
+Generate or edit images with the bundled `scripts/image_gen.py`. Use the user's Azure deployment name, run a dry run before an unfamiliar configuration, and keep all requests on Azure OpenAI v1 Image API.
 
 ## Workflow
 
-1. Decide `generate`, `edit`, or `generate-batch`.
-2. Collect prompt(s), exact text, constraints, and any input image(s) or mask(s).
-3. Resolve Azure configuration in this order:
-   - direct CLI value (`--endpoint`, `--deployment`)
-   - custom env-var-name flag (`--endpoint-env`, `--deployment-env`, `--api-key-env`)
-   - default env var (`AZURE_OPENAI_ENDPOINT`, `AZURE_OPENAI_DEPLOYMENT`, `AZURE_OPENAI_API_KEY`)
-4. Run the bundled CLI with `--dry-run` first unless configuration is already known-good.
-5. Inspect outputs, then iterate with one targeted prompt or mask change at a time.
+1. Select `generate`, `edit`, or `generate-batch`.
+2. Collect prompts, exact text, constraints, input images, and masks.
+3. Resolve the Azure endpoint/deployment from direct flags, custom environment-variable names, or `AZURE_OPENAI_ENDPOINT` / `AZURE_OPENAI_DEPLOYMENT`.
+4. Identify the underlying model. For custom deployment names, use `--image-model` or `AZURE_OPENAI_IMAGE_MODEL`. Do not change the user's deployment to a raw model ID.
+5. Run `--dry-run` unless configuration is already known to work.
+6. Inspect the result and iterate with one targeted prompt or mask change.
 
-## Command Selection
+## Command selection
 
-- If the user provides one or more input images, or asks to retouch, inpaint, mask, localize text, replace a background, or "change only X", use `edit`.
-- If the user needs many prompts or many assets in one run, use `generate-batch`.
-- If the user has a GPT-image-2 result on a flat key-color background and needs a transparent PNG, use `postprocess-transparent`.
-- Otherwise use `generate`.
+- Input images, retouching, inpainting, localization, background replacement, or "change only X": `edit`.
+- Many prompts/assets: `generate-batch`.
+- Removing a flat key color from an existing image: `postprocess-transparent`.
+- Otherwise: `generate`.
 
-## Authentication
+## Model capabilities
 
-- Default to `--auth-mode api-key`.
-- Use `--auth-mode entra` when the environment is configured for `DefaultAzureCredential`.
-- Never ask the user to paste secrets into chat.
-- If `--auth-mode api-key` is used, read the key from an environment variable, not a CLI secret flag.
-- If `--auth-mode entra` is used, require `azure-identity` for live calls.
+| Profile | Size | Quality | Input fidelity |
+| --- | --- | --- | --- |
+| `gpt-image-1`, `gpt-image-1.5` | 1024x1024, 1536x1024, 1024x1536 | low, medium, high | low/high |
+| `gpt-image-1-mini` | Legacy sizes | low, medium, high | Omit |
+| `gpt-image-2` | Omitted, auto, custom | low, medium, high | Omit; always high |
+| `gpt-image-2.5-sunburst`, `gpt-image-2.5-flare` | Omitted, auto, custom | low, medium, high, xhigh, max, auto | low/high |
 
-## Defaults And Rules
+Selection: job `image_model` → `--image-model` → `AZURE_OPENAI_IMAGE_MODEL` → inference from the most specific deployment identifier, including snapshots. Explicit `auto` requests inference. Unknown names retain legacy defaults and warn; ask for the underlying model only when it matters to the request.
 
-- Resolve or ask for the Azure deployment name instead of inventing one.
-- Prefer the bundled CLI over ad hoc wrapper scripts.
-- Keep prompt augmentation short and structural; do not invent new creative requirements.
-- For edits, restate invariants every iteration.
-- Use `quality=high` for text-heavy or detail-critical outputs.
-- Use `input_fidelity=high` for identity-preserving or layout-sensitive edits.
-- For GPT-image-2 deployments, omit `--size` unless the user asks for an explicit resolution; Azure can route automatically when size is not set.
-- GPT-image-2 explicit sizes must use `WIDTHxHEIGHT` with dimensions aligned to multiples of 16 and at least 655,360 total pixels.
-- GPT-image-2 requests above 8,294,400 pixels are allowed, but Azure may resize the final image to fit.
-- GPT-image-2 does not support native `background=transparent`; use GPT-image-1/1.5 for native transparency, or generate on a flat key color and run `postprocess-transparent`.
-- For GPT-image-2 key-color cutouts, request a pure flat background such as `#00FF00` or `#FF00FF`, no shadows, no reflections, crisp edges, and no use of the key color in the subject.
-- Do not invent `smimage`, `image`, `xlimage`, or token-bucket CLI flags until Microsoft publishes official Image API parameter names.
+Sunburst favors editing precision; Flare favors fast everyday generation. Select only a model already available in the user's Azure deployment.
 
-## Prompt Augmentation
+## Defaults and rules
 
-Reformat user prompts into a short production-style spec. Include only lines that are relevant.
+- Preserve `quality=high`, one image, and PNG unless requested otherwise. Higher 2.5 qualities are explicit choices, not automatic upgrades.
+- Omit size for Image 2/2.5 unless the user requests a resolution; `--size auto` is also supported. Legacy size defaults to `1024x1024`.
+- Custom sizes: 16-pixel alignment, maximum edge 3,840, maximum aspect ratio 3:1, and 655,360–8,294,400 pixels. Image 2.5 above 3,686,400 pixels is experimental.
+- Native transparency requires PNG. Image 2 native transparency is preview and depends on Azure availability; use it only when requested. Image 2.5 accepts native transparency.
+- If native transparency is unavailable, generate on a pure flat key color and use ImageMagick `postprocess-transparent`. Color removal is not semantic segmentation.
+- Azure output is PNG/JPEG; WEBP and compression on PNG fail locally.
+- For edits, restate invariants. Use `--input-fidelity high` only for profiles that support it; Image 2 always uses high fidelity and Mini cannot configure it.
+- Prefer this CLI over ad hoc wrappers. Keep prompt augmentation short and preserve the user's requirements.
+- Existing originals/downscaled copies fail before paid requests unless `--force` is explicit. Batch output paths must be unique even with force.
+- Never paste secrets into chat, prompts, source files, or CLI arguments.
 
-```text
-Use case: <taxonomy slug>
-Asset type: <where the asset will be used>
-Primary request: <user prompt>
-Scene/background: <environment>
-Subject: <main subject>
-Style/medium: <photo/illustration/3D/etc>
-Composition/framing: <wide/close/top-down; placement>
-Lighting/mood: <lighting + mood>
-Color palette: <palette notes>
-Materials/textures: <surface details>
-Text (verbatim): "<exact text>"
-Constraints: <must keep/must avoid>
-Avoid: <negative constraints>
-```
+## Authentication and dependencies
 
-## Use-Case Taxonomy
+- Default to `--auth-mode api-key`; read the key from `AZURE_OPENAI_API_KEY` or `--api-key-env`.
+- Use `--auth-mode entra` with `DefaultAzureCredential` when configured.
+- Python 3.11+, `openai>=3.22.1,<4`, and `pillow>=12.3.0,<13` are required.
+- Live Entra calls additionally need `azure-identity>=1.26.0,<2`.
+- Prefer installation from the plugin root's `pyproject.toml`; standalone copies can use the equivalent pip/uv recipes.
+- ImageMagick `magick` is needed only for local `postprocess-transparent`. No bundled segmentation dependency.
 
-Generate:
-- `photorealistic-natural`
-- `product-mockup`
-- `ui-mockup`
-- `infographic-diagram`
-- `logo-brand`
-- `illustration-story`
-- `stylized-concept`
-- `historical-scene`
+## Runtime scope
 
-Edit:
-- `text-localization`
-- `identity-preserve`
-- `precise-object-edit`
-- `lighting-weather`
-- `background-extraction`
-- `style-transfer`
-- `compositing`
-- `sketch-to-render`
+Azure `/openai/v1/` Image API only. No classic `api-version` paths, Responses API, streaming, direct OpenAI runtime, or automatic Azure deployment changes. OpenAI retirement dates do not establish Azure retirement dates.
 
-## Output Conventions
+## Reference map
 
-- Use `tmp/imagegen/` for temporary JSONL files or scratch assets.
-- Write final outputs under `output/imagegen/` when working inside a repo.
-- Keep filenames stable and descriptive by setting `--out` or `--out-dir`.
-
-## Dependencies
-
-- Runtime dependencies: `openai>=1.109.1` and `pillow`.
-- Add `azure-identity` only for live `--auth-mode entra` runs.
-- Add ImageMagick only when using local `postprocess-transparent`; it shells out to `magick` on PATH.
-- Do not require `rembg`; mention it only as an optional semantic background-removal tool for hair, glass, soft edges, or non-flat backgrounds.
-- If the repo root is available, prefer its `pyproject.toml` for dependency installation. Otherwise install equivalent packages in the active Python environment.
-
-## Reference Map
-
-- `references/cli.md`: command catalog and CLI recipes
-- `references/azure-auth.md`: API key and Entra auth setup
-- `references/prompting.md`: prompting principles and iteration tips
-- `references/sample-prompts.md`: copy/paste prompt recipes
-- `references/limitations.md`: explicit v1 boundaries and non-goals
+- `references/cli.md`: commands, configuration, batch overrides
+- `references/azure-auth.md`: API keys and Entra
+- `references/prompting.md`: prompt structure and iteration
+- `references/sample-prompts.md`: examples
+- `references/limitations.md`: limits, preview caveats, official sources

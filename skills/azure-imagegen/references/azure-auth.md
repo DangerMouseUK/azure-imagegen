@@ -46,13 +46,13 @@ Enable Entra auth with:
 Live Entra-authenticated calls require:
 
 ```bash
-python -m pip install azure-identity
+python -m pip install "azure-identity>=1.26.0,<2"
 ```
 
 Or:
 
 ```bash
-uv pip install azure-identity
+uv pip install "azure-identity>=1.26.0,<2"
 ```
 
 The CLI uses `DefaultAzureCredential`, so any supported local or hosted credential source can satisfy auth.
@@ -85,6 +85,10 @@ The CLI normalizes the root resource URL to `/openai/v1/`.
 ## Deployment guidance
 
 Pass the Azure deployment name, not the raw model id. The deployment should point at a compatible Azure OpenAI image model deployment.
+
+For a custom name such as images-prod, also set --image-model or AZURE_OPENAI_IMAGE_MODEL
+to its underlying model identifier (for example, gpt-image-2.5-flare). This selects local
+validation capabilities and does not change the Azure deployment or authentication.
 
 ## Failure modes
 

@@ -28,6 +28,7 @@ DEFAULT_TRANSPARENT_FUZZ = 6.0
 
 DEFAULT_ENDPOINT_ENV = "AZURE_OPENAI_ENDPOINT"
 DEFAULT_DEPLOYMENT_ENV = "AZURE_OPENAI_DEPLOYMENT"
+DEFAULT_IMAGE_MODEL_ENV = "AZURE_OPENAI_IMAGE_MODEL"
 DEFAULT_API_KEY_ENV = "AZURE_OPENAI_API_KEY"
 DEFAULT_ENTRA_SCOPE = "https://ai.azure.com/.default"
 
@@ -43,6 +44,36 @@ GPT_IMAGE_2_MAX_PIXELS = 8_294_400
 
 
 @dataclass(frozen=True)
+class ImageModelProfile:
+    name: str
+    custom_sizes: bool = False
+    qualities: frozenset[str] = frozenset(ALLOWED_QUALITIES)
+    input_fidelity: bool = True
+    transparency_preview: bool = False
+    experimental_above_pixels: Optional[int] = None
+
+
+IMAGE_MODEL_PROFILES = {
+    "gpt-image-1": ImageModelProfile("gpt-image-1"),
+    "gpt-image-1-mini": ImageModelProfile("gpt-image-1-mini", input_fidelity=False),
+    "gpt-image-1.5": ImageModelProfile("gpt-image-1.5"),
+    "gpt-image-2": ImageModelProfile(
+        "gpt-image-2", custom_sizes=True, input_fidelity=False, transparency_preview=True
+    ),
+    **{
+        name: ImageModelProfile(
+            name,
+            custom_sizes=True,
+            qualities=frozenset({"low", "medium", "high", "xhigh", "max", "auto"}),
+            experimental_above_pixels=3_686_400,
+        )
+        for name in ("gpt-image-2.5-sunburst", "gpt-image-2.5-flare")
+    },
+}
+LEGACY_IMAGE_PROFILE = ImageModelProfile("legacy")
+
+
+@dataclass(frozen=True)
 class ResolvedValue:
     value: Optional[str]
     source: str
@@ -55,6 +86,7 @@ class AzureRuntimeConfig:
     endpoint_source: str
     deployment: str
     deployment_source: str
+    image_model: ResolvedValue
     auth_mode: str
     api_key: Optional[str]
     api_key_source: Optional[str]
@@ -101,13 +133,45 @@ def _normalize_output_format(fmt: Optional[str]) -> str:
     if not fmt:
         return DEFAULT_OUTPUT_FORMAT
     fmt = fmt.lower()
-    if fmt not in {"png", "jpeg", "jpg", "webp"}:
-        _die("output-format must be png, jpeg, jpg, or webp.")
+    if fmt == "webp":
+        _die("Azure Image API does not support WEBP output. Use png or jpeg.")
+    if fmt not in {"png", "jpeg", "jpg"}:
+        _die("output-format must be png, jpeg, or jpg.")
     return "jpeg" if fmt == "jpg" else fmt
 
 
-def _is_gpt_image_2_deployment(deployment: str) -> bool:
-    return "gpt-image-2" in deployment.lower()
+def _resolve_image_model(
+    deployment: str,
+    selection: ResolvedValue,
+    job_image_model: Optional[str] = None,
+) -> Tuple[ImageModelProfile, str]:
+    value = selection.value
+    source = selection.source
+    if job_image_model is not None:
+        value = job_image_model
+        source = "job:image_model"
+    if value is not None:
+        if not isinstance(value, str):
+            _die("image_model must be a model identifier or auto.")
+        value = value.strip().lower()
+        if value != "auto":
+            if value not in IMAGE_MODEL_PROFILES:
+                _die(
+                    f"Unknown image model {value!r} from {source}. Choose auto or "
+                    + ", ".join(sorted(IMAGE_MODEL_PROFILES))
+                    + "."
+                )
+            return IMAGE_MODEL_PROFILES[value], source
+
+    # Match specific families before shorter names; also recognize snapshot suffixes.
+    for name in sorted(IMAGE_MODEL_PROFILES, key=len, reverse=True):
+        if re.search(rf"(?<![a-z0-9]){re.escape(name)}(?![a-z0-9.])", deployment.lower()):
+            return IMAGE_MODEL_PROFILES[name], "inferred:deployment"
+    _warn(
+        f"Cannot infer the image model from deployment {deployment!r}; using legacy "
+        f"capabilities. Set --image-model or {DEFAULT_IMAGE_MODEL_ENV} to its model identifier."
+    )
+    return LEGACY_IMAGE_PROFILE, "fallback:legacy"
 
 
 def _parse_size(size: str) -> Optional[Tuple[int, int]]:
@@ -117,45 +181,52 @@ def _parse_size(size: str) -> Optional[Tuple[int, int]]:
     return int(match.group(1)), int(match.group(2))
 
 
-def _validate_size(size: Optional[str], *, deployment: str) -> None:
-    if not _is_gpt_image_2_deployment(deployment):
+def _validate_size(size: Optional[str], *, profile: ImageModelProfile) -> None:
+    if not profile.custom_sizes:
         if size is not None and size not in ALLOWED_SIZES:
             _die(
                 "size must be one of 1024x1024, 1536x1024, or 1024x1536 for Azure image deployments."
             )
         return
 
-    if size is None:
+    if size is None or size == "auto":
         return
 
     parsed = _parse_size(size)
     if parsed is None:
-        _die("size must be WIDTHxHEIGHT or omitted for GPT-image-2 deployments.")
+        _die(f"size must be WIDTHxHEIGHT, auto, or omitted for {profile.name}.")
 
     width, height = parsed
     if width % 16 != 0 or height % 16 != 0:
-        _die("GPT-image-2 size dimensions must each be a multiple of 16.")
+        _die(f"{profile.name} size dimensions must each be a multiple of 16.")
+
+    if min(width, height) <= 0:
+        _die("size dimensions must be greater than zero.")
+    if max(width, height) > 3840:
+        _die(f"{profile.name} size edges must not exceed 3,840 pixels.")
+    if max(width, height) > 3 * min(width, height):
+        _die(f"{profile.name} size aspect ratio must not exceed 3:1.")
 
     pixels = width * height
     if pixels < GPT_IMAGE_2_MIN_PIXELS:
-        _die("GPT-image-2 size must be at least 655,360 total pixels.")
+        _die(f"{profile.name} size must be at least 655,360 total pixels.")
     if pixels > GPT_IMAGE_2_MAX_PIXELS:
-        _warn(
-            "GPT-image-2 requested size exceeds 8,294,400 pixels; Azure may resize the final image to fit."
-        )
+        _die(f"{profile.name} size must not exceed 8,294,400 total pixels.")
+    if profile.experimental_above_pixels is not None and pixels > profile.experimental_above_pixels:
+        _warn(f"{profile.name} resolutions above 2560x1440 (3,686,400 pixels) are experimental.")
 
 
-def _effective_size(size: Optional[str], *, deployment: str) -> Optional[str]:
+def _effective_size(size: Optional[str], *, profile: ImageModelProfile) -> Optional[str]:
     if size is not None:
         return size
-    if _is_gpt_image_2_deployment(deployment):
+    if profile.custom_sizes:
         return None
     return DEFAULT_SIZE
 
 
-def _validate_quality(quality: str) -> None:
-    if quality not in ALLOWED_QUALITIES:
-        _die("quality must be one of low, medium, or high.")
+def _validate_quality(quality: str, *, profile: ImageModelProfile) -> None:
+    if quality not in profile.qualities:
+        _die(f"quality for {profile.name} must be one of {', '.join(sorted(profile.qualities))}.")
 
 
 def _validate_background(background: Optional[str]) -> None:
@@ -167,32 +238,75 @@ def _validate_transparency(
     background: Optional[str],
     output_format: str,
     *,
-    deployment: str,
+    profile: ImageModelProfile,
 ) -> None:
-    if background == "transparent" and _is_gpt_image_2_deployment(deployment):
-        _die(
-            "GPT-image-2 does not support background=transparent. Use a GPT-image-1/1.5 "
-            "deployment for native transparent output, or generate on a flat key color "
-            "and run postprocess-transparent."
-        )
-    if background == "transparent" and output_format not in {"png", "webp"}:
-        _die("transparent background requires output-format png or webp.")
+    if background == "transparent":
+        if output_format != "png":
+            _die("transparent background requires output-format png on Azure.")
+        if profile.transparency_preview:
+            _warn(
+                "GPT Image 2 native transparency is a preview feature; availability depends "
+                "on your Azure deployment. If unavailable, use postprocess-transparent."
+            )
 
 
-def _validate_generate_payload(payload: Dict[str, Any]) -> None:
-    n = int(payload.get("n", 1))
+def _payload_integer(value: Any, label: str) -> int:
+    if isinstance(value, bool) or not isinstance(value, int):
+        _die(f"{label} must be an integer.")
+    return value
+
+
+def _prepare_image_payload(
+    payload: Dict[str, Any],
+    config: AzureRuntimeConfig,
+    *,
+    job_image_model: Optional[str] = None,
+) -> Tuple[ImageModelProfile, str]:
+    """Resolve capabilities and normalize/validate the final request before any API call."""
+    deployment = payload["model"]
+    if not isinstance(deployment, str) or not deployment.strip():
+        _die("model must be a non-empty Azure deployment name.")
+    profile, source = _resolve_image_model(deployment, config.image_model, job_image_model)
+    n = _payload_integer(payload.get("n", 1), "n")
     if n < 1 or n > 10:
         _die("n must be between 1 and 10")
-    deployment = str(payload.get("model", ""))
-    size = payload.get("size")
-    quality = str(payload.get("quality", DEFAULT_QUALITY))
+    size = _effective_size(payload.get("size"), profile=profile)
+    if size is not None and not isinstance(size, str):
+        _die("size must be a WIDTHxHEIGHT string or auto.")
+    quality = payload.get("quality", DEFAULT_QUALITY)
     background = payload.get("background")
-    _validate_size(str(size) if size is not None else None, deployment=deployment)
-    _validate_quality(quality)
+    _validate_size(size, profile=profile)
+    if not isinstance(quality, str):
+        _die("quality must be a string.")
+    _validate_quality(quality, profile=profile)
+    if background is not None and not isinstance(background, str):
+        _die("background must be transparent, opaque, or auto.")
     _validate_background(background)
+    output_format = payload.get("output_format")
+    if output_format is not None and not isinstance(output_format, str):
+        _die("output_format must be png or jpeg.")
+    output_format = _normalize_output_format(output_format)
+    _validate_transparency(background, output_format, profile=profile)
     oc = payload.get("output_compression")
-    if oc is not None and not (0 <= int(oc) <= 100):
-        _die("output_compression must be between 0 and 100")
+    if oc is not None:
+        if not 0 <= _payload_integer(oc, "output_compression") <= 100:
+            _die("output_compression must be between 0 and 100")
+        if output_format != "jpeg":
+            _die("output_compression is only supported for JPEG output on Azure.")
+    fidelity = payload.get("input_fidelity")
+    if fidelity is not None:
+        if fidelity not in ("low", "high"):
+            _die("input_fidelity must be low or high.")
+        if not profile.input_fidelity:
+            _die(f"{profile.name} does not support configurable input_fidelity; omit --input-fidelity.")
+    if payload.get("moderation") is not None and payload["moderation"] not in ("low", "auto"):
+        _die("moderation must be low or auto.")
+    payload["output_format"] = output_format
+    if size is None:
+        payload.pop("size", None)
+    else:
+        payload["size"] = size
+    return profile, source
 
 
 def _build_output_paths(
@@ -554,11 +668,19 @@ def _resolve_runtime_config(args: argparse.Namespace) -> AzureRuntimeConfig:
             dry_run=args.dry_run,
         )
 
+    env_image_model = os.getenv(DEFAULT_IMAGE_MODEL_ENV, "").strip() or None
+    image_model = ResolvedValue(
+        value=args.image_model if args.image_model is not None else env_image_model,
+        source="flag:--image-model" if args.image_model is not None else (
+            f"env:{DEFAULT_IMAGE_MODEL_ENV}" if env_image_model is not None else "auto"
+        ),
+    )
     return AzureRuntimeConfig(
         base_url=_normalize_base_url(endpoint.value or ""),
         endpoint_source=endpoint.source,
         deployment=deployment.value or "",
         deployment_source=deployment.source,
+        image_model=image_model,
         auth_mode=args.auth_mode,
         api_key=api_key.value if api_key else None,
         api_key_source=api_key.source if api_key else None,
@@ -567,12 +689,20 @@ def _resolve_runtime_config(args: argparse.Namespace) -> AzureRuntimeConfig:
     )
 
 
-def _runtime_preview(config: AzureRuntimeConfig) -> Dict[str, Any]:
+def _runtime_preview(
+    config: AzureRuntimeConfig,
+    profile: ImageModelProfile,
+    image_model_source: str,
+    *,
+    deployment: Optional[str] = None,
+) -> Dict[str, Any]:
     preview: Dict[str, Any] = {
         "base_url": config.base_url,
         "endpoint_source": config.endpoint_source,
-        "deployment": config.deployment,
-        "deployment_source": config.deployment_source,
+        "deployment": deployment if deployment is not None else config.deployment,
+        "deployment_source": "job:model" if deployment is not None else config.deployment_source,
+        "image_model": profile.name,
+        "image_model_source": image_model_source,
         "auth_mode": config.auth_mode,
     }
     if config.auth_mode == "api-key":
@@ -595,7 +725,7 @@ def _build_auth_value(config: AzureRuntimeConfig) -> Any:
     except ImportError:
         _die(
             "azure-identity is required for --auth-mode entra. Install with "
-            "`python -m pip install azure-identity` or `uv pip install azure-identity`."
+            "`python -m pip install \"azure-identity>=1.26.0,<2\"`."
         )
 
     credential = DefaultAzureCredential()
@@ -608,8 +738,8 @@ def _create_client(config: AzureRuntimeConfig):
         from openai import OpenAI
     except ImportError:
         _die(
-            "openai SDK not installed. Install with `python -m pip install openai` "
-            "or `uv pip install openai`."
+            "openai SDK not installed. Install with "
+            "`python -m pip install \"openai>=3.22.1,<4\"`."
         )
     return OpenAI(base_url=config.base_url, api_key=auth_value)
 
@@ -623,12 +753,12 @@ def _create_async_client(config: AzureRuntimeConfig):
             import openai as _openai  # noqa: F401
         except ImportError:
             _die(
-                "openai SDK not installed. Install with `python -m pip install openai` "
-                "or `uv pip install openai`."
+                "openai SDK not installed. Install with "
+                "`python -m pip install \"openai>=3.22.1,<4\"`."
             )
         _die(
             "AsyncOpenAI not available in this openai SDK version. Upgrade with "
-            "`python -m pip install -U openai` or `uv pip install -U openai`."
+            "`python -m pip install -U \"openai>=3.22.1,<4\"`."
         )
     if callable(auth_value):
         token_provider = auth_value
@@ -799,7 +929,7 @@ async def _run_generate_batch(args: argparse.Namespace, config: AzureRuntimeConf
     base_payload = {
         "model": config.deployment,
         "n": args.n,
-        "size": _effective_size(args.size, deployment=config.deployment),
+        "size": args.size,
         "quality": args.quality,
         "background": args.background,
         "output_format": args.output_format,
@@ -820,15 +950,10 @@ async def _run_generate_batch(args: argparse.Namespace, config: AzureRuntimeConf
         job_payload = _merge_non_null(job_payload, {k: job.get(k) for k in base_payload.keys()})
         job_payload = {k: v for k, v in job_payload.items() if v is not None}
 
-        _validate_generate_payload(job_payload)
-        effective_output_format = _normalize_output_format(job_payload.get("output_format"))
-        _validate_transparency(
-            job_payload.get("background"),
-            effective_output_format,
-            deployment=str(job_payload.get("model", config.deployment)),
+        profile, model_source = _prepare_image_payload(
+            job_payload, config, job_image_model=job.get("image_model")
         )
-        if "output_format" in job_payload:
-            job_payload["output_format"] = effective_output_format
+        effective_output_format = job_payload["output_format"]
 
         n = int(job_payload.get("n", 1))
         outputs = _job_output_paths(
@@ -849,7 +974,10 @@ async def _run_generate_batch(args: argparse.Namespace, config: AzureRuntimeConf
                 ]
             _print_request(
                 {
-                    "azure": _runtime_preview(config),
+                    "azure": _runtime_preview(
+                        config, profile, model_source,
+                        deployment=job_payload["model"] if job.get("model") is not None else None,
+                    ),
                     "endpoint": "/images/generations",
                     "job": i,
                     "outputs": [str(p) for p in outputs],
@@ -935,7 +1063,7 @@ def _generate(args: argparse.Namespace, config: AzureRuntimeConfig) -> None:
         "model": config.deployment,
         "prompt": prompt,
         "n": args.n,
-        "size": _effective_size(args.size, deployment=config.deployment),
+        "size": args.size,
         "quality": args.quality,
         "background": args.background,
         "output_format": args.output_format,
@@ -944,10 +1072,8 @@ def _generate(args: argparse.Namespace, config: AzureRuntimeConfig) -> None:
     }
     payload = {k: v for k, v in payload.items() if v is not None}
 
-    output_format = _normalize_output_format(args.output_format)
-    _validate_transparency(args.background, output_format, deployment=config.deployment)
-    if "output_format" in payload:
-        payload["output_format"] = output_format
+    profile, model_source = _prepare_image_payload(payload, config)
+    output_format = payload["output_format"]
     output_paths = _build_output_paths(
         args.out,
         output_format,
@@ -957,7 +1083,10 @@ def _generate(args: argparse.Namespace, config: AzureRuntimeConfig) -> None:
     )
 
     if args.dry_run:
-        _print_request({"azure": _runtime_preview(config), "endpoint": "/images/generations", **payload})
+        _print_request({
+            "azure": _runtime_preview(config, profile, model_source),
+            "endpoint": "/images/generations", **payload,
+        })
         return
 
     _preflight_outputs(
@@ -1006,7 +1135,7 @@ def _edit(args: argparse.Namespace, config: AzureRuntimeConfig) -> None:
         "model": config.deployment,
         "prompt": prompt,
         "n": args.n,
-        "size": _effective_size(args.size, deployment=config.deployment),
+        "size": args.size,
         "quality": args.quality,
         "background": args.background,
         "output_format": args.output_format,
@@ -1015,10 +1144,8 @@ def _edit(args: argparse.Namespace, config: AzureRuntimeConfig) -> None:
     }
     payload = {k: v for k, v in payload.items() if v is not None}
 
-    output_format = _normalize_output_format(args.output_format)
-    _validate_transparency(args.background, output_format, deployment=config.deployment)
-    if "output_format" in payload:
-        payload["output_format"] = output_format
+    profile, model_source = _prepare_image_payload(payload, config)
+    output_format = payload["output_format"]
     output_paths = _build_output_paths(
         args.out,
         output_format,
@@ -1032,7 +1159,10 @@ def _edit(args: argparse.Namespace, config: AzureRuntimeConfig) -> None:
         payload_preview["image"] = [str(p) for p in image_paths]
         if mask_path:
             payload_preview["mask"] = str(mask_path)
-        _print_request({"azure": _runtime_preview(config), "endpoint": "/images/edits", **payload_preview})
+        _print_request({
+            "azure": _runtime_preview(config, profile, model_source),
+            "endpoint": "/images/edits", **payload_preview,
+        })
         return
 
     _preflight_outputs(
@@ -1126,6 +1256,11 @@ class _FileBundle:
 def _add_shared_args(parser: argparse.ArgumentParser) -> None:
     parser.add_argument("--endpoint")
     parser.add_argument("--deployment")
+    parser.add_argument(
+        "--image-model",
+        choices=["auto", *sorted(IMAGE_MODEL_PROFILES)],
+        help="Capability profile, not the Azure deployment. Defaults to AZURE_OPENAI_IMAGE_MODEL or inference.",
+    )
     parser.add_argument("--auth-mode", default="api-key", choices=sorted(ALLOWED_AUTH_MODES))
     parser.add_argument("--endpoint-env")
     parser.add_argument("--deployment-env")
@@ -1215,14 +1350,10 @@ def main() -> int:
         args.func(args)
         return 0
 
-    if args.n < 1 or args.n > 10:
-        _die("--n must be between 1 and 10")
     if getattr(args, "concurrency", 1) < 1 or getattr(args, "concurrency", 1) > 25:
         _die("--concurrency must be between 1 and 25")
     if getattr(args, "max_attempts", 3) < 1 or getattr(args, "max_attempts", 3) > 10:
         _die("--max-attempts must be between 1 and 10")
-    if args.output_compression is not None and not (0 <= args.output_compression <= 100):
-        _die("--output-compression must be between 0 and 100")
     if args.command == "generate-batch" and not args.out_dir:
         _die("generate-batch requires --out-dir")
     if getattr(args, "downscale_max_dim", None) is not None and args.downscale_max_dim < 1:
@@ -1231,10 +1362,6 @@ def main() -> int:
         _die("--entra-scope cannot be empty")
 
     config = _resolve_runtime_config(args)
-    _validate_size(args.size, deployment=config.deployment)
-    _validate_quality(args.quality)
-    _validate_background(args.background)
-
     args.func(args, config)
     return 0
 
