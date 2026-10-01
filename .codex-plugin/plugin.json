@@ -1,0 +1,47 @@
+{
+  "name": "azure-imagegen",
+  "version": "0.2.0",
+  "description": "Azure OpenAI v1 image generation and editing plugin for Codex with a bundled Python CLI.",
+  "author": {
+    "name": "DangerMouseUK",
+    "url": "https://github.com/dangermouseuk"
+  },
+  "homepage": "https://github.com/dangermouseuk/azure-imagegen",
+  "repository": "https://github.com/dangermouseuk/azure-imagegen",
+  "license": "MIT",
+  "keywords": [
+    "azure-openai",
+    "image-generation",
+    "codex-skill",
+    "plugin",
+    "python"
+  ],
+  "skills": "./skills/",
+  "interface": {
+    "displayName": "Azure ImageGen",
+    "shortDescription": "Azure OpenAI image workflows for Codex",
+    "longDescription": "Generate, edit, and batch-create images with Azure OpenAI v1 deployments through a packaged Codex skill and bundled Python CLI.",
+    "developerName": "DangerMouseUK",
+    "category": "Productivity",
+    "capabilities": [
+      "Interactive",
+      "Write"
+    ],
+    "websiteURL": "https://github.com/dangermouseuk/azure-imagegen",
+    "privacyPolicyURL": "https://github.com/dangermouseuk/azure-imagegen/blob/main/PRIVACY.md",
+    "termsOfServiceURL": "https://github.com/dangermouseuk/azure-imagegen/blob/main/TERMS.md",
+    "defaultPrompt": [
+      "Dry-run a product image prompt with Azure ImageGen.",
+      "Edit an image background with an Azure deployment.",
+      "Batch-generate assets from a JSONL prompt file."
+    ],
+    "brandColor": "#0078D4",
+    "composerIcon": "./assets/composer-icon.svg",
+    "logo": "./assets/logo.svg",
+    "screenshots": [
+      "./assets/screenshot-plugin.png",
+      "./assets/screenshot-cli.png",
+      "./assets/screenshot-install.png"
+    ]
+  }
+}

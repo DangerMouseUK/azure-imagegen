@@ -1,0 +1,4 @@
+interface:
+  display_name: "Azure ImageGen"
+  short_description: "Azure OpenAI image generation skill"
+  default_prompt: "Use $azure-imagegen to generate or edit images with an Azure OpenAI deployment."

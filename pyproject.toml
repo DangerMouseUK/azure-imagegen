@@ -1,0 +1,44 @@
+[build-system]
+requires = ["setuptools>=68"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "azure-imagegen"
+version = "0.2.0"
+description = "Azure OpenAI image generation and editing plugin for Codex with a bundled Python CLI."
+readme = "README.md"
+requires-python = ">=3.11"
+license = { text = "MIT" }
+authors = [{ name = "DangerMouseUK" }]
+keywords = [
+  "azure-openai",
+  "image-generation",
+  "codex-skill",
+  "plugin",
+  "python",
+]
+dependencies = [
+  "openai>=1.109.1",
+  "pillow>=10.0.0",
+]
+
+[project.optional-dependencies]
+entra = [
+  "azure-identity>=1.17.0",
+]
+dev = [
+  "pytest>=8.0.0",
+  "pyyaml>=6.0.0",
+]
+
+[project.urls]
+Homepage = "https://github.com/dangermouseuk/azure-imagegen"
+Repository = "https://github.com/dangermouseuk/azure-imagegen"
+Issues = "https://github.com/dangermouseuk/azure-imagegen/issues"
+
+[tool.pytest.ini_options]
+addopts = "-q"
+testpaths = ["tests"]
+
+[tool.setuptools]
+py-modules = []
