@@ -10,7 +10,7 @@ import json
 import os
 import shutil
 import subprocess
-from dataclasses import dataclass
+from dataclasses import dataclass, field
 from pathlib import Path
 import re
 import sys
@@ -88,9 +88,7 @@ class AzureRuntimeConfig:
     deployment_source: str
     image_model: ResolvedValue
     auth_mode: str
-    api_key: Optional[str]
-    api_key_source: Optional[str]
-    api_key_env_name: Optional[str]
+    api_key: Optional[str] = field(repr=False)
     entra_scope: str
 
 
@@ -636,6 +634,21 @@ def _resolve_value(
     return ResolvedValue(value=None, source="missing", env_name=env_name)
 
 
+def _resolve_api_key(env_name_flag: Optional[str], *, dry_run: bool) -> Optional[str]:
+    # Keep credential configuration out of diagnostics, even when a key is
+    # accidentally supplied instead of an environment-variable name.
+    env_name = env_name_flag.strip() if env_name_flag else DEFAULT_API_KEY_ENV
+    value = os.getenv(env_name, "").strip() if env_name else ""
+    if value:
+        return value
+    message = "API key is not set. Configure the credential environment variable; see --api-key-env and --help."
+    if dry_run:
+        _warn(message + " Dry-run only.")
+        return None
+    _die(message)
+    return None  # unreachable
+
+
 def _resolve_runtime_config(args: argparse.Namespace) -> AzureRuntimeConfig:
     endpoint = _resolve_value(
         flag_value=args.endpoint,
@@ -656,17 +669,9 @@ def _resolve_runtime_config(args: argparse.Namespace) -> AzureRuntimeConfig:
         dry_run=args.dry_run,
     )
 
-    api_key: Optional[ResolvedValue] = None
+    api_key: Optional[str] = None
     if args.auth_mode == "api-key":
-        api_key = _resolve_value(
-            flag_value=None,
-            env_name_flag=args.api_key_env,
-            default_env_name=DEFAULT_API_KEY_ENV,
-            label="api key",
-            flag_name="api-key-env",
-            allow_missing_in_dry_run=True,
-            dry_run=args.dry_run,
-        )
+        api_key = _resolve_api_key(args.api_key_env, dry_run=args.dry_run)
 
     env_image_model = os.getenv(DEFAULT_IMAGE_MODEL_ENV, "").strip() or None
     image_model = ResolvedValue(
@@ -682,9 +687,7 @@ def _resolve_runtime_config(args: argparse.Namespace) -> AzureRuntimeConfig:
         deployment_source=deployment.source,
         image_model=image_model,
         auth_mode=args.auth_mode,
-        api_key=api_key.value if api_key else None,
-        api_key_source=api_key.source if api_key else None,
-        api_key_env_name=api_key.env_name if api_key else None,
+        api_key=api_key,
         entra_scope=args.entra_scope,
     )
 
@@ -705,10 +708,7 @@ def _runtime_preview(
         "image_model_source": image_model_source,
         "auth_mode": config.auth_mode,
     }
-    if config.auth_mode == "api-key":
-        preview["api_key_source"] = config.api_key_source
-        preview["api_key_env_name"] = config.api_key_env_name
-    else:
+    if config.auth_mode == "entra":
         preview["entra_scope"] = config.entra_scope
     return preview
 
@@ -716,8 +716,7 @@ def _runtime_preview(
 def _build_auth_value(config: AzureRuntimeConfig) -> Any:
     if config.auth_mode == "api-key":
         if not config.api_key:
-            env_name = config.api_key_env_name or DEFAULT_API_KEY_ENV
-            _die(f"API key is not set. Set {env_name} or choose --auth-mode entra.")
+            _die("API key is not set. Configure the credential environment variable or choose --auth-mode entra.")
         return config.api_key
 
     try:
@@ -1264,7 +1263,10 @@ def _add_shared_args(parser: argparse.ArgumentParser) -> None:
     parser.add_argument("--auth-mode", default="api-key", choices=sorted(ALLOWED_AUTH_MODES))
     parser.add_argument("--endpoint-env")
     parser.add_argument("--deployment-env")
-    parser.add_argument("--api-key-env")
+    parser.add_argument(
+        "--api-key-env",
+        help="Environment variable holding the API key; defaults to AZURE_OPENAI_API_KEY.",
+    )
     parser.add_argument("--entra-scope", default=DEFAULT_ENTRA_SCOPE)
 
     parser.add_argument("--prompt")

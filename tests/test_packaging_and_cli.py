@@ -464,15 +464,15 @@ def test_credentials_are_never_written_to_cli_output(
         assert requests == []
         assert not (tmp_path / "output").exists()
         preview, _ = json.JSONDecoder().raw_decode(output.out)
-        assert preview["azure"]["api_key_env_name"] == env_name
-        assert preview["azure"]["api_key_source"] == f"env:{env_name}"
+        assert "api_key_env_name" not in preview["azure"]
+        assert "api_key_source" not in preview["azure"]
     else:
         assert len(requests) == (2 if command == "generate-batch" else 1)
         assert all(request.headers["authorization"] == f"Bearer {credential}" for request in requests)
 
 
 @pytest.mark.parametrize("dry_run", [False, True])
-def test_missing_credential_messages_only_show_the_environment_name(
+def test_missing_credential_messages_do_not_echo_credential_configuration(
     mocked_image_api, monkeypatch, tmp_path: Path, capsys, dry_run: bool,
 ) -> None:
     module, requests = mocked_image_api
@@ -491,12 +491,57 @@ def test_missing_credential_messages_only_show_the_environment_name(
         assert error.value.code == 1
 
     output = capsys.readouterr()
-    assert f"api key is not set. Set {env_name}." in output.err
+    assert "API key is not set. Configure the credential environment variable" in output.err
+    assert "--api-key-env" in output.err
+    assert env_name not in output.out + output.err
     if dry_run:
         preview = json.loads(output.out)
-        assert preview["azure"]["api_key_source"] == f"missing:{env_name}"
+        assert "api_key_source" not in preview["azure"]
     assert requests == []
     assert not (tmp_path / "output").exists()
+
+
+@pytest.mark.parametrize("command", ["generate", "edit", "generate-batch"])
+@pytest.mark.parametrize("dry_run", [False, True])
+def test_key_accidentally_passed_as_environment_name_is_not_echoed(
+    mocked_image_api, monkeypatch, tmp_path: Path, capsys, command: str, dry_run: bool,
+) -> None:
+    module, requests = mocked_image_api
+    credential = secrets.token_hex(32)
+    monkeypatch.delenv(credential, raising=False)
+    args = _live_cli_args(command, tmp_path) + ["--api-key-env", credential]
+    if dry_run:
+        args.append("--dry-run")
+    monkeypatch.setattr(sys, "argv", [str(SCRIPT_PATH), *args])
+
+    if dry_run:
+        assert module.main() == 0
+    else:
+        with pytest.raises(SystemExit) as error:
+            module.main()
+        assert error.value.code == 1
+
+    output = capsys.readouterr()
+    assert credential not in output.out + output.err
+    assert requests == []
+    assert not (tmp_path / "output").exists()
+
+
+def test_runtime_configuration_repr_hides_the_api_key(mocked_image_api, monkeypatch) -> None:
+    module, _ = mocked_image_api
+    credential = secrets.token_hex(32)
+    monkeypatch.setenv("AZURE_OPENAI_API_KEY", credential)
+    parser = module.argparse.ArgumentParser()
+    module._add_shared_args(parser)
+    args = parser.parse_args([
+        "--endpoint", "https://example.openai.azure.com",
+        "--deployment", "gpt-image-1.5",
+    ])
+
+    config = module._resolve_runtime_config(args)
+
+    assert credential not in repr(config)
+    assert module._build_auth_value(config) == credential
 
 
 @pytest.mark.parametrize("command", ["generate", "edit", "generate-batch"])

@@ -32,8 +32,10 @@ python .\skills\azure-imagegen\scripts\image_gen.py generate `
 Rules:
 
 - Prefer environment variables instead of secret CLI flags.
+- Pass the variable name to `--api-key-env`, never the key itself.
 - Keep endpoint and deployment values non-secret.
 - Treat the API key as secret and never paste it into chat.
+- Credential values and location details are omitted from diagnostics and dry-run previews.
 
 ## 2. Entra ID mode
 

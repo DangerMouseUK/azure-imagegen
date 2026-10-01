@@ -45,6 +45,8 @@ Capability selection resolves JSONL `image_model` → CLI `--image-model` → `A
 
 `--deployment` (and JSONL `model`) still selects the actual Azure deployment. The model profile never replaces that request field. Dry-run JSON includes `azure.image_model` and `azure.image_model_source`; these metadata fields are not sent to the SDK.
 
+Dry-run JSON retains `azure.auth_mode` and omits credential values and location details. The former `azure.api_key_source` and `azure.api_key_env_name` fields are no longer emitted. Default and custom credential environment variables are still supported.
+
 ## Quick start
 
 Set a stable path to the skill CLI from the repo root:
